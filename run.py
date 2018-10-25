@@ -135,12 +135,6 @@ def imageCallback(m):
     adamosClient.updateDevice(update)
 
 
-def serviceCallback(m):
-    """Receives results of service calls
-    """
-    print(m)
-
-
 def createMeasurement(topic, mtype):
     """Create a measurement object that can be sent to ADAMOS
 

@@ -39,8 +39,6 @@ class AdamosClient:
         #return response.json()
 
     def sendMeasurement(self, measurement):
-        print(self.C8Y_BASE)
-        print(self.C8Y_HEADERS)
         response = requests.post(self.C8Y_BASE + '/measurement/measurements', headers=self.C8Y_HEADERS, data=json.dumps(measurement))
         return response.json()
 
@@ -142,5 +140,3 @@ class AdamosClient:
             self.setC8YHeaders(AUTH)
 
         logging.info('Connected to device ID: ' + self.DEVICE_ID)
-        print(AUTH)
-        print(self.C8Y_HEADERS)

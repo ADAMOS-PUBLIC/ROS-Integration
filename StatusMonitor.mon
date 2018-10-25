@@ -1,0 +1,91 @@
+using com.apama.cumulocity.Alarm;
+using com.apama.cumulocity.Event;
+using com.apama.cumulocity.Measurement;
+using com.apama.cumulocity.MeasurementValue;
+
+/** This monitor is responsible for ...  */
+monitor StatusMonitor {
+	
+	dictionary<string, float> status;
+	
+	/*
+	*	Action that loads when this monitor is injected into the correlator
+	*   - Subscribes to all measurements of type "cobot_status", 
+	*   - extracts the measurement value of the claw and
+	*   - sends an event to ADAMOS when the claw reading changes
+	*/
+	action onload() {
+		monitor.subscribe(Measurement.CHANNEL);
+		log "StatusMonitor loaded";
+		
+		on all Measurement(type="cobot_status") as m {		
+			optional<MeasurementValue> mv := extractValue(m, "status", "claw");
+			ifpresent mv {
+				checkClawChange(m, mv.value);
+				status.add(m.source, mv.value);
+			}
+		}
+	}
+		
+	/*
+	*   Action that extracts the actual measurement value by series and fragment
+	*   param Measurement m: received measurement
+	*   param string series: series to be extracted
+	*   param string fragment: fragment to be extracted
+	*   returns optional<MeasurementValue>: Value of the measurement or empty optional
+	*/
+	action extractValue(Measurement m, string series, string fragment) returns optional<MeasurementValue> {
+		optional<MeasurementValue> result := new optional<MeasurementValue>;
+		
+		if (m.measurements.hasKey(series)) {
+			dictionary<string, MeasurementValue> mv := m.measurements[series];
+			if (mv.hasKey(fragment)) {
+				 result := mv.getOrDefault(fragment);
+				
+			}
+		} 
+		return result;
+	}
+	
+	/*
+	*   Action that checks if the claw value changed
+	*   - sends an event to ADAMOS if a change is detected
+	*   param Measurement m: received measurement
+	*   param float currentValue: the extracted current value of the claw
+	*/
+	action checkClawChange(Measurement m, float currentValue) {
+		if (status.hasKey(m.source)) {
+			float pastValue := status.getOrDefault(m.source);
+			if (currentValue != pastValue) {
+				sendClawEvent(currentValue, m.source, m.time);
+			}
+		} else {
+			sendClawEvent(currentValue, m.source, m.time);
+		}
+	}
+	
+	/*
+	*   Action that sends a claw event to ADAMOS
+	*   param float value: value of the claw
+	*   param string deviceId: ID of the device the event should be created at
+	*   param float time: timestamp to use for the event
+	*/
+	action sendClawEvent(float value, string deviceId, float time) {
+		string text := "Claw is now " + getClawString(value);
+		send Event("", "cobot_status_claw_event", deviceId, time,text, new dictionary<string,any>) to Event.CHANNEL;
+	}
+	
+	/*
+	*   Action that converts a claw measurement to a string representation
+	*   param float value: claw measurement
+	*   returns string: string representation of the claw measurement
+	*/
+	action getClawString(float value) returns string {
+		if (value = 1.0) {
+			return "CLOSED";
+		} else {
+			return "OPEN";
+		}
+	}
+	
+}

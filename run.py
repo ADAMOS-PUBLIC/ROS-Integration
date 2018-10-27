@@ -4,6 +4,8 @@ import requests, base64, json, os, time, sys, time
 from adamos import AdamosClient
 from ros import RosBridgeClient
 from datetime import datetime
+import cv2
+import numpy as np
 
 # --- CONFIG START ---
 ADAMOS_URL = 'http://<tenant>.adamos-dev.com'
@@ -120,9 +122,11 @@ def imageCallback(m):
     """Receives messages containing the camera image.
     Converts and sends the image as a device update to ADAMOS.
     """
+    convertedImage = convertImage(m.msg.data)
+
     update = {
         "camera": {
-            "data": m.msg.data,
+            "data": convertedImage,
             "format": m.msg.format
         }
     }
@@ -178,6 +182,22 @@ def clawToString(claw):
         return "CLOSED"
     if (claw < 1.0):
         return "OPEN"
+
+def convertImage(rawImage):
+    # Read image
+    inputImageDecoded = base64.b64decode(rawImage)
+    nparr = np.frombuffer(inputImageDecoded, dtype="int8")
+    bayer = cv2.imdecode(nparr, cv2.IMREAD_GRAYSCALE | cv2.IMREAD_ANYDEPTH)
+
+    # Convert and resize
+    rgb = cv2.cvtColor(bayer, cv2.COLOR_BAYER_BG2BGR)
+    small = cv2.resize(rgb, (0,0), fx=0.5, fy=0.5) 
+
+    # Output as base64
+    retval, buffer = cv2.imencode('.jpg', small)
+    jpg_as_text = base64.b64encode(buffer).decode('utf-8')
+
+    return jpg_as_text
 
 
 
